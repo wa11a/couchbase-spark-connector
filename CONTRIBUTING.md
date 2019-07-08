@@ -52,6 +52,36 @@ Before you start coding, you should usually open an issue in the [Couchbase bug 
 (JIRA). That may avoid unnecessary effort, for example if the change you are planning to make is going to be
 obsolete because of a modification we've already planned.
 
+In order to test the change you'll need a running local couchbase cluster with user 'Administrator' and password 'password'.
+you'll also need 2 buckets: 'travel-sample', 'default'
+you'll also need a query service and a search service
+
+you can create the cluster on docker using the following commands:
+
+
+```bash
+# installing couchbase on docker:
+docker run -d --name db-spark-connector -p 8091-8096:8091-8096 -p 11210-11211:11210-11211 couchbase
+
+# set the services
+docker exec db-spark-connector bash -c 'curl -X POST -d services=kv,index,n1ql,fts,cbas,eventing http://Administrator:password@localhost:8091/node/controller/setupServices'
+
+# initialize node
+curl  -u Administrator:password -v -X POST http://127.0.0.1:8091/nodes/self/controller/settings \
+  -d 'path=%2Fopt%2Fcouchbase%2Fvar%2Flib%2Fcouchbase%2Fdata& \
+  index_path=%2Fopt%2Fcouchbase%2Fvar%2Flib%2Fcouchbase%2Fdata& \
+  cbas_path=%2Fmnt%2Fd1&cbas_path=%2Fmnt%2Fd2&cbas_path=%2Fmnt%2Fd3'
+
+# create the cluster
+docker exec db-spark-connector bash -c 'curl -X POST -d name=travel-sample -d ramQuotaMB=100 -d authType=sasl  -d flushEnabled=1  -d replicaNumber=0 http://Administrator:password@localhost:8091/pools/default/buckets'
+docker exec db-spark-connector bash -c 'curl -X POST -d name=default -d ramQuotaMB=100 -d authType=sasl  -d flushEnabled=1  -d replicaNumber=0 http://Administrator:password@localhost:8091/pools/default/buckets'
+
+# setup administrator user and password
+curl -u Administrator:password -v -X POST http://127.0.0.1:8091/settings/web -d password=password -d username=Administrator -d port=8091
+docker exec db-spark-connector bash -c 'curl -X PUT --data "name=Administrator&roles=cluster_admin&password=password" -H "Content-Type: application/x-www-form-urlencoded" http://Administrator:password@127.0.0.1:8091/settings/rbac/users/local/Administrator'
+
+```
+
 This will also give the change an issue number that you can reference in the commit.
 
 To prepare a patch for the `master` branch, start from it and preferably create a new branch for your patch:
